@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wayfarer Lifelog
 // @namespace    https://github.com/wiinuk/wayfarer-scripts
-// @downloadURL  https://github.com/wiinuk/wayfarer-scripts/raw/main/wayfarer-lifelog.user.js
+// @downloadURL  https://github.com/wiinuk/wayfarer-scripts/raw/master/wayfarer-lifelog.user.js
 // @homepageURL  https://github.com/wiinuk/wayfarer-scripts
 // @version      0.1
 // @description  Add LifeLog to Wayfarer
@@ -15,5 +15,5 @@
 
 (function() {
     'use strict';
-    
+
 })();
