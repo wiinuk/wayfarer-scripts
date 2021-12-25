@@ -2,7 +2,7 @@
 
 ## 使い方
 
-[インストール](https://github.com/wiinuk/wayfarer-scripts/raw/master/wayfarer-lifelog.user.js)
+[インストール](/raw/master/wayfarer-lifelog.user.js)
 
 // TODO
 
@@ -13,6 +13,8 @@
 [node.js](https://nodejs.org/ja/) が必要です。
 
 ### ビルド
+
+以下のコマンドを実行する
 
 ```shell
 npm install
@@ -27,4 +29,4 @@ npm run build
 
 1. Tampermonkeyアイコン → 新規ユーザースクリプトを追加する → エディターで [デバッグ用スクリプト](/wrapper_script_in_tampermonkey.user.js) の内容を書き込んで保存
 
-// TODO
+1. // TODO
