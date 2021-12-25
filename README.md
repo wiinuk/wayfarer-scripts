@@ -25,6 +25,6 @@ npm run build
 
 1. 拡張機能 → Tampermonkey → ファイルの URL へのアクセスを許可する に ☑
 
-1. Tampermonkeyアイコン → 新規ユーザースクリプトを追加する → エディターに [デバッグ用スクリプト](/wrapper_script_in_tampermonkey.user.js) を書き込んで保存
+1. Tampermonkeyアイコン → 新規ユーザースクリプトを追加する → エディターで [デバッグ用スクリプト](/wrapper_script_in_tampermonkey.user.js) の内容を書き込んで保存
 
 // TODO
