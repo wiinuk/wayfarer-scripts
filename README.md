@@ -14,7 +14,7 @@
 
 ### ビルド
 
-以下のコマンドを実行する
+以下のコマンドを実行する。
 
 ```shell
 npm install
@@ -25,8 +25,8 @@ npm run build
 
 1. Chrome に Tampermonkey をインストールする。
 
-1. 拡張機能 → Tampermonkey → ファイルの URL へのアクセスを許可する に ☑
+1. 拡張機能 → Tampermonkey → ファイルの URL へのアクセスを許可する に ☑。
 
-1. Tampermonkeyアイコン → 新規ユーザースクリプトを追加する → エディターで [デバッグ用スクリプト](/wrapper_script_in_tampermonkey.user.js) の内容を書き込んで保存
+1. Tampermonkeyアイコン → 新規ユーザースクリプトを追加する → [デバッグ用スクリプト](/wrapper_script_in_tampermonkey.user.js) の中身をエディターにコピーして保存。
 
 1. // TODO
