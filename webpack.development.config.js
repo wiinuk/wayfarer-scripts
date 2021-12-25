@@ -11,10 +11,6 @@ const config = {
         path: os.tmpdir(),
         filename: "tampermonkey_debug_sym.js",
     },
-    devServer: {
-        host: "https://wayfarer.nianticlabs.com/new/profile",
-        port: 8080,
-    },
 };
 
 module.exports = config;

@@ -14,7 +14,10 @@ module.exports = compiler => compiler.hooks.emit.tapPromise(PluginName, async co
             if (Path.extname(fileName) !== ".js") { continue; }
 
             const contents = compilation.assets[fileName].source().toString()
-            const headerContents = contents.match(userScriptPattern)[0]
+            const userScriptMatch = contents.match(userScriptPattern);
+            if (userScriptMatch == null) { continue }
+
+            const headerContents = userScriptMatch[0];
             const contentsWithoutHeader = contents.replace(userScriptPattern, "")
 
             compilation.assets[fileName] = new ConcatSource(
