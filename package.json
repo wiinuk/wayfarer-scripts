@@ -5,7 +5,9 @@
   "description": "",
   "scripts": {
     "build": "webpack",
-    "debug": "webpack --watch --config ./webpack.development.config.js"
+    "debug": "webpack --watch --config ./webpack.development.config.js",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "repository": {
     "type": "git",
@@ -18,12 +20,13 @@
   },
   "homepage": "https://github.com/wiinuk/wayfarer-scripts#readme",
   "devDependencies": {
+    "@types/jest": "^27.0.3",
     "browser-sync": "^2.27.7",
-    "rxjs": "^7.4.0",
+    "jest": "^27.4.5",
+    "ts-jest": "^27.1.2",
     "ts-loader": "^9.2.6",
     "typescript": "^4.5.4",
     "webpack": "^5.65.0",
-    "webpack-cli": "^4.9.1",
-    "webpack-dev-server": "^4.7.1"
+    "webpack-cli": "^4.9.1"
   }
 }

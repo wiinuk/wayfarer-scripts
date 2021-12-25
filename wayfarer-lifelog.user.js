@@ -14,7 +14,27 @@
 
 /******/ (() => { // webpackBootstrap
 /******/ 	"use strict";
-var __webpack_exports__ = {};var __makeTemplateObject = (undefined && undefined.__makeTemplateObject) || function (cooked, raw) {
+/******/ 	// The require scope
+/******/ 	var __webpack_require__ = {};
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/global */
+/******/ 	(() => {
+/******/ 		__webpack_require__.g = (function() {
+/******/ 			if (typeof globalThis === 'object') return globalThis;
+/******/ 			try {
+/******/ 				return this || new Function('return this')();
+/******/ 			} catch (e) {
+/******/ 				if (typeof window === 'object') return window;
+/******/ 			}
+/******/ 		})();
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+
+;// CONCATENATED MODULE: ./wayfarer-lifelog.ts
+var __makeTemplateObject = (undefined && undefined.__makeTemplateObject) || function (cooked, raw) {
     if (Object.defineProperty) { Object.defineProperty(cooked, "raw", { value: raw }); } else { cooked.raw = raw; }
     return cooked;
 };
@@ -63,7 +83,8 @@ var __spreadArray = (undefined && undefined.__spreadArray) || function (to, from
     }
     return to.concat(ar || Array.prototype.slice.call(from));
 };
-var injectXHRGet = function (targetUrl, onGet) {
+var injectXHRGet = function (_a, targetUrl, onGet) {
+    var XMLHttpRequest = _a.XMLHttpRequest;
     var open = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function (method, url) {
         if (url === targetUrl && method === 'GET') {
@@ -130,27 +151,33 @@ var parsePropertiesResponse = function (response) {
     return { email: email, data: { version: version, performance: performance, rewardProgress: rewardProgress } };
 };
 var lifelogStorageKey = "WAYFARER_LIFELOG_";
-var appendLifeLogPage = function (email, data) { return __awaiter(void 0, void 0, void 0, function () {
-    var lifeLogs, lifeLog, now, newPage, lastPath;
+var appendLifeLogPageTo = function (lifeLogs, email, data) { return __awaiter(void 0, void 0, void 0, function () {
+    var lifeLog, now, newPage, lastPage;
     var _a;
     return __generator(this, function (_b) {
-        lifeLogs = JSON.parse(localStorage.getItem(lifelogStorageKey) || JSON.stringify({}));
         lifeLog = (_a = lifeLogs[email]) !== null && _a !== void 0 ? _a : (lifeLogs[email] = []);
-        now = new Date().toUTCString();
+        now = new Date().toISOString();
         newPage = {
             utc1: now,
             utc2: now,
             data: data,
         };
-        lastPath = lifeLog[lifeLog.length];
-        if (lastPath != null && JSON.stringify(lastPath.data) === JSON.stringify(newPage.data)) {
-            lastPath.utc2 = newPage.utc2;
+        lastPage = lifeLog[lifeLog.length - 1];
+        if (lastPage != null && JSON.stringify(lastPage.data) === JSON.stringify(newPage.data)) {
+            lastPage.utc2 = newPage.utc2;
         }
         // 最後のページと新しいページが同じ内容でないなら、新しいページを最後に挿入する
         else {
             lifeLog.push(newPage);
         }
-        // ローカルストレージに保存
+        return [2 /*return*/];
+    });
+}); };
+var appendLifeLogPage = function (email, data) { return __awaiter(void 0, void 0, void 0, function () {
+    var lifeLogs;
+    return __generator(this, function (_a) {
+        lifeLogs = JSON.parse(localStorage.getItem(lifelogStorageKey) || JSON.stringify({}));
+        appendLifeLogPageTo(lifeLogs, email, data);
         localStorage.setItem(lifelogStorageKey, JSON.stringify(lifeLogs));
         return [2 /*return*/];
     });
@@ -187,9 +214,13 @@ var handleAsyncError = function (asyncAction) { return function () {
         console.error(error);
     });
 }; };
-injectXHRGet('/api/v1/vault/properties', handleAsyncError(onGetProperties));
+var main = function (global) {
+    injectXHRGet(global, '/api/v1/vault/properties', handleAsyncError(onGetProperties));
+};
 var templateObject_1, templateObject_2, templateObject_3, templateObject_4, templateObject_5, templateObject_6;
 
+;// CONCATENATED MODULE: ./wayfarer-lifelog.user.ts
+main(__webpack_require__.g);
 
 /******/ })()
 ;

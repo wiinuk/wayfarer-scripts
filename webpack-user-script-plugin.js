@@ -3,7 +3,7 @@ const Path = require("path");
 const { ConcatSource } = require("webpack-sources")
 
 const PluginName = "WebpackUserScriptPlugin";
-const userScriptPattern = /(?=(^|\n))\s*\/\/\s*==UserScript==\s*\n((.|\r\n)*?)\r\n\s*\/\/\s*==\/UserScript==\s*(\n|$)/i;
+const headerPattern = /(?=(^|\n))\s*\/\/\s*==UserScript==[^\n]\n((.|\r\n)*?)\r\n\s*\/\/\s*==\/UserScript==[^\n]*(\n|$)/i;
 
 /** @type {import("webpack").WebpackPluginFunction} */
 module.exports = compiler => compiler.hooks.emit.tapPromise(PluginName, async compilation => {
@@ -14,11 +14,12 @@ module.exports = compiler => compiler.hooks.emit.tapPromise(PluginName, async co
             if (Path.extname(fileName) !== ".js") { continue; }
 
             const contents = compilation.assets[fileName].source().toString()
-            const userScriptMatch = contents.match(userScriptPattern);
+            const userScriptMatch = contents.match(headerPattern);
             if (userScriptMatch == null) { continue }
 
             const headerContents = userScriptMatch[0];
-            const contentsWithoutHeader = contents.replace(userScriptPattern, "")
+            console.log(JSON.stringify(headerContents))
+            const contentsWithoutHeader = contents.replace(headerPattern, "")
 
             compilation.assets[fileName] = new ConcatSource(
                 headerContents, "\n",
