@@ -7,5 +7,5 @@
 // @match        http://*/*
 // @match        https://*/*
 // @grant        none
-// @require      file:///C:/Users/<UserName>/AppData/Local/Temp/tampermonkey_debug_sym.js
+// @require      file:///C:/Users/<ユーザー名>/AppData/Local/Temp/tampermonkey_debug_sym.js
 // ==/UserScript==
