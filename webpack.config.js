@@ -1,32 +1,30 @@
 //@ts-check
-const UserScriptPlugin = require('./webpack-user-script-plugin');
+const UserScriptPlugin = require("./webpack-user-script-plugin");
 
-const entry = './wayfarer-lifelog.user.ts'
+const entry = "./wayfarer-lifelog.user.ts";
 
 /** @type {import("webpack").Configuration} */
 const config = {
-    mode: 'production',
+    mode: "production",
     entry,
-    plugins: [
-        UserScriptPlugin,
-    ],
+    plugins: [UserScriptPlugin],
     module: {
         rules: [
             {
                 test: /\.tsx?$/,
-                use: 'ts-loader',
+                use: "ts-loader",
             },
         ],
     },
     resolve: {
-        extensions: ['.ts', '.js'],
+        extensions: [".ts", ".js"],
     },
     optimization: {
         minimize: false,
     },
     output: {
         path: __dirname,
-        filename: 'wayfarer-lifelog.user.js',
-    }
-}
-module.exports = config
+        filename: "wayfarer-lifelog.user.js",
+    },
+};
+module.exports = config;

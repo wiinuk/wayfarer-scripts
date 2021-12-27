@@ -12,4 +12,4 @@
 // ==/UserScript==
 
 import { main } from "./wayfarer-lifelog";
-main(global)
+main(global);

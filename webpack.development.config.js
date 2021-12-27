@@ -1,6 +1,6 @@
 //@ts-check
-const os = require('os');
-const productionConfig = require('./webpack.config.js');
+const os = require("os");
+const productionConfig = require("./webpack.config.js");
 
 /** @type {import("webpack").Configuration} */
 const config = {

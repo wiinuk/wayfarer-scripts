@@ -85,15 +85,18 @@ var __spreadArray = (undefined && undefined.__spreadArray) || function (to, from
 };
 var injectXHRGet = function (_a, targetUrl, onGet) {
     var XMLHttpRequest = _a.XMLHttpRequest;
-    var open = XMLHttpRequest.prototype.open;
+    var originalOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function (method, url) {
-        if (url === targetUrl && method === 'GET') {
-            this.addEventListener('load', onGet, false);
+        if (url === targetUrl && method === "GET") {
+            this.addEventListener("load", onGet, false);
         }
-        open.apply(this, arguments);
+        // eslint-disable-next-line prefer-rest-params, @typescript-eslint/no-explicit-any
+        originalOpen.apply(this, arguments);
     };
 };
-var sleep = function (milliseconds) { return new Promise(function (resolve) { return setTimeout(resolve, milliseconds); }); };
+var sleep = function (milliseconds) {
+    return new Promise(function (resolve) { return setTimeout(resolve, milliseconds); });
+};
 var waitElement = function (selectors, retryCount, intervalMilliseconds) {
     if (retryCount === void 0) { retryCount = 10; }
     if (intervalMilliseconds === void 0) { intervalMilliseconds = 1000; }
@@ -118,7 +121,7 @@ var waitElement = function (selectors, retryCount, intervalMilliseconds) {
                 case 3:
                     i++;
                     return [3 /*break*/, 1];
-                case 4: throw new Error('Element not found');
+                case 4: throw new Error("Element not found");
             }
         });
     });
@@ -131,14 +134,12 @@ var error = function (template) {
     throw new Error(String.raw.apply(String, __spreadArray([template], substitutions, false)));
 };
 var asObjectOrNull = function (jsonOrUndefined) {
-    return (typeof jsonOrUndefined === "object" && jsonOrUndefined !== null ? jsonOrUndefined : null);
+    return (typeof jsonOrUndefined === "object" && jsonOrUndefined !== null
+        ? jsonOrUndefined
+        : null);
 };
-var asStringOrNull = function (x) {
-    return typeof x === "string" ? x : null;
-};
-var asNumberOrNull = function (x) {
-    return typeof x === "number" ? x : null;
-};
+var asStringOrNull = function (x) { return (typeof x === "string" ? x : null); };
+var asNumberOrNull = function (x) { return (typeof x === "number" ? x : null); };
 var parsePropertiesResponse = function (response) {
     var _a, _b, _c, _d, _e, _f, _g;
     var jsonRaw = JSON.parse(response);
@@ -155,7 +156,7 @@ var appendLifeLogPageTo = function (lifeLogs, email, data) { return __awaiter(vo
     var lifeLog, now, newPage, lastPage;
     var _a;
     return __generator(this, function (_b) {
-        lifeLog = (_a = lifeLogs[email]) !== null && _a !== void 0 ? _a : (lifeLogs[email] = []);
+        lifeLog = ((_a = lifeLogs[email]) !== null && _a !== void 0 ? _a : (lifeLogs[email] = []));
         now = new Date().toISOString();
         newPage = {
             utc1: now,
@@ -163,7 +164,8 @@ var appendLifeLogPageTo = function (lifeLogs, email, data) { return __awaiter(vo
             data: data,
         };
         lastPage = lifeLog[lifeLog.length - 1];
-        if (lastPage != null && JSON.stringify(lastPage.data) === JSON.stringify(newPage.data)) {
+        if (lastPage != null &&
+            JSON.stringify(lastPage.data) === JSON.stringify(newPage.data)) {
             lastPage.utc2 = newPage.utc2;
         }
         // 最後のページと新しいページが同じ内容でないなら、新しいページを最後に挿入する
@@ -182,40 +184,63 @@ var appendLifeLogPage = function (email, data) { return __awaiter(void 0, void 0
         return [2 /*return*/];
     });
 }); };
+var insertedGraphElement = null;
+var getInsertedGraphElement = function () { return __awaiter(void 0, void 0, void 0, function () {
+    var parentElement, graphElement, style;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0:
+                if (insertedGraphElement != null) {
+                    return [2 /*return*/, insertedGraphElement];
+                }
+                return [4 /*yield*/, waitElement("wf-header > div")];
+            case 1:
+                parentElement = _a.sent();
+                graphElement = document.createElement("div");
+                style = graphElement.style;
+                style.display = "flex";
+                style.flexDirection = "row";
+                style.boxSizing = "border-box";
+                style.height = "100%";
+                style.width = "10em";
+                // style.padding = "1em"
+                style.border = "solid 1px #ccc";
+                style.borderRadius = "0.5em";
+                parentElement.insertBefore(graphElement, parentElement.querySelector(":scope > a"));
+                return [2 /*return*/, (insertedGraphElement = graphElement)];
+        }
+    });
+}); };
 // プロパティを要求したとき
 var onGetProperties = function () {
     return __awaiter(this, void 0, void 0, function () {
-        var _a, email, data;
+        var _a, email, data, graphElement;
         return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
                     _a = parsePropertiesResponse(this.response), email = _a.email, data = _a.data;
                     // 追記
-                    return [4 /*yield*/, appendLifeLogPage(email, data)
-                        // グラフの親要素の表示を待つ
-                    ];
+                    return [4 /*yield*/, appendLifeLogPage(email, data)];
                 case 1:
                     // 追記
                     _b.sent();
-                    // グラフの親要素の表示を待つ
-                    return [4 /*yield*/, waitElement("wf-header")
-                        // TODO: グラフを組み立てる
-                    ];
+                    return [4 /*yield*/, getInsertedGraphElement()];
                 case 2:
-                    // グラフの親要素の表示を待つ
-                    _b.sent();
+                    graphElement = _b.sent();
                     return [2 /*return*/];
             }
         });
     });
 };
-var handleAsyncError = function (asyncAction) { return function () {
-    asyncAction.call(this).catch(function (error) {
-        console.error(error);
-    });
-}; };
+var handleAsyncError = function (asyncAction) {
+    return function () {
+        asyncAction.call(this).catch(function (error) {
+            console.error(error);
+        });
+    };
+};
 var main = function (global) {
-    injectXHRGet(global, '/api/v1/vault/properties', handleAsyncError(onGetProperties));
+    injectXHRGet(global, "/api/v1/vault/properties", handleAsyncError(onGetProperties));
 };
 var templateObject_1, templateObject_2, templateObject_3, templateObject_4, templateObject_5, templateObject_6;
 
