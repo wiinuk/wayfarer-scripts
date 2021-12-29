@@ -27,4 +27,9 @@ jobs:
     - run: npm ci
     - run: npm run build --if-present
     - run: npm test
+    - run: echo "::set-output name=count::$(git diff --name-only | wc -l)"
+      id: changes
     - run: npm run commit-user-script
+      if: matrix.node-version == '16.x' && steps.changes.outputs.count > 0
+      
+    
