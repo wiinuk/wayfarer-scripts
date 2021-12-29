@@ -1,6 +1,6 @@
 import { appendLifeLogPageTo } from "./wayfarer-lifelog";
 
-const setDateSpy = (epoch = new Date(2000, 1, 1)) => {
+const setDateSpy = (epoch = Date.UTC(2000, 0, 1)) => {
     const oldDate = Date;
     let lastDate = new oldDate(epoch);
     const spy = jest.spyOn(global, "Date").mockImplementation(() => {
@@ -52,8 +52,8 @@ describe("serialization", () => {
             expect(lifeLogs).toEqual({
                 address: [
                     {
-                        utc1: "2000-01-31T15:00:01.000Z",
-                        utc2: "2000-01-31T15:00:01.000Z",
+                        utc1: "2000-01-01T00:00:01.000Z",
+                        utc2: "2000-01-01T00:00:01.000Z",
                         data: {
                             version: "0",
                             performance: "good",
@@ -61,8 +61,8 @@ describe("serialization", () => {
                         },
                     },
                     {
-                        utc1: "2000-01-31T15:00:02.000Z",
-                        utc2: "2000-01-31T15:00:02.000Z",
+                        utc1: "2000-01-01T00:00:02.000Z",
+                        utc2: "2000-01-01T00:00:02.000Z",
                         data: {
                             version: "0",
                             performance: "good",
@@ -86,8 +86,8 @@ describe("serialization", () => {
             expect(logs).toEqual({
                 address: [
                     {
-                        utc1: "2000-01-31T15:00:01.000Z",
-                        utc2: "2000-01-31T15:00:02.000Z",
+                        utc1: "2000-01-01T00:00:01.000Z",
+                        utc2: "2000-01-01T00:00:02.000Z",
                         data: {
                             version: "0",
                             performance: "good",
