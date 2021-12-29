@@ -1,4 +1,5 @@
 import Chart from "chart.js/auto";
+import { range } from "./array-extensions";
 import Resources from "./resources.json";
 const { Messages } = Resources;
 
@@ -12,19 +13,12 @@ const DayOfWeeks = [
     Messages.Saturday,
 ] as const;
 
-const range = (count: number) => {
-    const result = [];
-    for (let i = 0; i < count; i++) {
-        result.push(i);
-    }
-    return result;
-};
 export const newAddDays = (current: Date, days: number) => {
     const result = new Date(current);
     result.setHours(result.getHours() + days * 24);
     return result;
 };
-export type DayValue = {
+export type DaySummary = {
     finished: number;
     agreement: number;
 };
@@ -83,7 +77,7 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
     });
     const setData = (
         currentDate: Date,
-        values: readonly Readonly<DayValue>[]
+        values: readonly Readonly<DaySummary>[]
     ) => {
         chart.data.labels = range(values.length).map((_, i, xs) =>
             getDayOfWeek(currentDate, xs.length - 1 - i)

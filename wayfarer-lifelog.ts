@@ -1,4 +1,5 @@
-import { appendChartElement, DayValue, newAddDays } from "./chart-element";
+import { appendChartElement, DaySummary, newAddDays } from "./chart-element";
+import { range } from "./array-extensions";
 import * as V from "./json-spec";
 
 type primitive = undefined | null | boolean | number | bigint | string;
@@ -56,36 +57,6 @@ const waitElement = async (
     }
     throw new Error("Element not found");
 };
-const error = (template: TemplateStringsArray, ...substitutions: unknown[]) => {
-    throw new Error(String.raw(template, ...substitutions));
-};
-type Json =
-    | null
-    | boolean
-    | number
-    | string
-    | Array<Json>
-    | { [key: string]: Json };
-type JsonWithoutObject = null | boolean | number | string | Array<Json>;
-type jsonObjectOrNull<J extends Json | undefined> = J extends
-    | JsonWithoutObject
-    | undefined
-    ? null
-    : J;
-type toUnknownJson<T> = {
-    [P in keyof T]?: T[P] extends JsonWithoutObject
-        ? Json
-        : toUnknownJson<T[P]>;
-};
-
-const asObjectOrNull = <J extends Json | undefined>(jsonOrUndefined: J) =>
-    (typeof jsonOrUndefined === "object" && jsonOrUndefined !== null
-        ? jsonOrUndefined
-        : null) as jsonObjectOrNull<J>;
-
-const asStringOrNull = (x: unknown) => (typeof x === "string" ? x : null);
-
-const asNumberOrNull = (x: unknown) => (typeof x === "number" ? x : null);
 
 const ResponseSpec = <T>(T: V.Spec<T>) =>
     V.record({
@@ -192,7 +163,7 @@ const appendLifeLogPage = async (
     const lifeLogs: LifeLogs = JSON.parse(
         localStorage.getItem(lifelogStorageKey) || JSON.stringify({})
     );
-    appendLifeLogPageTo(lifeLogs, email, data);
+    await appendLifeLogPageTo(lifeLogs, email, data);
     localStorage.setItem(lifelogStorageKey, JSON.stringify(lifeLogs));
 };
 
@@ -219,7 +190,7 @@ let insertedView: {
     chart: {
         setData: (
             currentDate: Date,
-            values: readonly Readonly<DayValue>[]
+            values: readonly Readonly<DaySummary>[]
         ) => void;
     };
 } | null = null;
@@ -264,7 +235,7 @@ const getDayValue = async (
     email: string,
     day: Date,
     retryCount: number
-): Promise<DayValue> => {
+): Promise<DaySummary> => {
     if (!(0 < retryCount)) {
         return { finished: 0, agreement: 0 };
     }
@@ -276,6 +247,7 @@ const getDayValue = async (
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const { data } = pages[i]!;
         switch (data.kind) {
+            // property
             case undefined: {
                 break;
             }
@@ -294,6 +266,21 @@ const getDayValue = async (
     return getDayValue(email, newAddDays(day, -1), retryCount - 1);
 };
 
+const onNewLog = async (email: string, log: DeepReadonly<LifeLogData>) => {
+    // 永続記録に追記
+    await appendLifeLogPage(email, log);
+
+    // グラフを更新
+    const now = new Date();
+    const days = 7;
+    const daySummaries = await Promise.all(
+        range(days).map((i) => getDayValue(email, newAddDays(now, -i), 7))
+    );
+    const view = await getInsertedView();
+    view.chart.setData(now, daySummaries);
+};
+
+let lastEmail: string | null = null;
 // プロパティを要求したとき
 const onGetProperties = async function (this: XMLHttpRequest) {
     // 応答を取得
@@ -306,26 +293,41 @@ const onGetProperties = async function (this: XMLHttpRequest) {
         },
     } = parseResponse(PropertiesResponseSpec, this);
 
-    // 永続記録に追記
-    await appendLifeLogPage(email, { version, performance, rewardProgress });
-
-    // グラフを更新
-    const values: DayValue[] = [];
-    const days = 7;
-    const now = new Date();
-    for (let i = days - 1; 0 <= i; i--) {
-        values.push(await getDayValue(email, newAddDays(now, -i), 7));
-    }
-    const view = await getInsertedView();
-    view.chart.setData(new Date(), values);
+    lastEmail = email;
+    await onNewLog(email, { version, performance, rewardProgress });
 };
 
 const onGetProfile = async function (this: XMLHttpRequest) {
+    if (lastEmail == null) {
+        return;
+    }
     // 応答を取得
     const {
         version,
-        result: { accepted },
+        result: {
+            performance,
+            finished,
+            accepted,
+            rejected,
+            duplicated,
+            progress,
+            available,
+            total,
+        },
     } = parseResponse(ProfileResponseSpec, this.response);
+
+    await onNewLog(lastEmail, {
+        kind: "profile",
+        version,
+        performance,
+        finished,
+        accepted,
+        rejected,
+        duplicated,
+        progress,
+        available,
+        total,
+    });
 };
 
 const handleAsyncError = <TThis>(
