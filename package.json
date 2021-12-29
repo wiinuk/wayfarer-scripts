@@ -11,7 +11,8 @@
     "test:watch": "jest --watch",
     "lint": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "bundle": "webpack"
+    "bundle": "webpack",
+    "commit-user-script": "commit.sh"
   },
   "repository": {
     "type": "git",
