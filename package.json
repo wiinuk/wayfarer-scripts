@@ -12,7 +12,7 @@
     "lint": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "bundle": "webpack",
-    "commit-user-script": "commit"
+    "commit-user-script": "sh commit.sh"
   },
   "repository": {
     "type": "git",
