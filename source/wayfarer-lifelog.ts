@@ -100,7 +100,12 @@ const _ProfileResponseSpec = ResponseSpec(ProfileResultSpec);
 const ProfileResponseSpec: typeof _ProfileResponseSpec = _ProfileResponseSpec;
 
 const parseResponse = <T>(spec: V.Spec<T>, xhr: XMLHttpRequest) => {
-    const data = JSON.parse(xhr.response);
+    let data;
+    try {
+        data = JSON.parse(xhr.response);
+    } catch (e) {
+        throw new Error(`JSON の解析に失敗しました。${xhr.response}`);
+    }
     spec.validate(data);
     return data;
 };
@@ -125,8 +130,6 @@ type LifeLogPage = {
 };
 type LifeLog = LifeLogPage[];
 type LifeLogs = { [email: string]: LifeLog };
-
-const lifelogStorageKey = "WAYFARER_LIFELOG_";
 
 export const appendLifeLogPageTo = async (
     lifeLogs: LifeLogs,
@@ -156,34 +159,58 @@ export const appendLifeLogPageTo = async (
     }
 };
 
-const appendLifeLogPage = async (
-    email: string,
-    data: DeepReadonly<LifeLogData>
-) => {
-    const lifeLogs: LifeLogs = JSON.parse(
-        localStorage.getItem(lifelogStorageKey) || JSON.stringify({})
-    );
-    await appendLifeLogPageTo(lifeLogs, email, data);
-    localStorage.setItem(lifelogStorageKey, JSON.stringify(lifeLogs));
+interface LifeLogStorage {
+    appendPage(email: string, data: DeepReadonly<LifeLogData>): Promise<void>;
+    getPagesAtDay(email: string, day: Date): Promise<LifeLogPage[]>;
+    logs(): AsyncIterable<{
+        email: string;
+        pages: AsyncIterable<LifeLogPage>;
+    }>;
+}
+
+const localStorageStorage = (key: string): LifeLogStorage => {
+    return {
+        async appendPage(email: string, data: DeepReadonly<LifeLogData>) {
+            const lifeLogs: LifeLogs = JSON.parse(
+                localStorage.getItem(key) || JSON.stringify({})
+            );
+            await appendLifeLogPageTo(lifeLogs, email, data);
+            localStorage.setItem(key, JSON.stringify(lifeLogs));
+        },
+        async getPagesAtDay(email: string, date: Date) {
+            const lifeLogs: LifeLogs = JSON.parse(
+                localStorage.getItem(key) || JSON.stringify({})
+            );
+            const logs = lifeLogs[email] ?? [];
+            const day = newZeroOClock(date);
+            return logs.filter(
+                (page) =>
+                    newZeroOClock(new Date(page.utc1)).getTime() ===
+                        day.getTime() ||
+                    newZeroOClock(new Date(page.utc2)).getTime() ===
+                        day.getTime()
+            );
+        },
+        async *logs() {
+            const lifeLogs: LifeLogs = JSON.parse(
+                localStorage.getItem(key) || JSON.stringify({})
+            );
+            for (const email in lifeLogs) {
+                yield {
+                    email,
+                    pages: (async function* pages() {
+                        yield* lifeLogs[email] ?? [];
+                    })(),
+                };
+            }
+        },
+    };
 };
 
 const newZeroOClock = (date: Date) => {
     const result = new Date(date);
     result.setHours(0, 0, 0, 0);
     return result;
-};
-
-const getLifeLogPagesAtDay = async (email: string, date: Date) => {
-    const lifeLogs: LifeLogs = JSON.parse(
-        localStorage.getItem(lifelogStorageKey) || JSON.stringify({})
-    );
-    const logs = lifeLogs[email] ?? [];
-    const day = newZeroOClock(date);
-    return logs.filter(
-        (page) =>
-            newZeroOClock(new Date(page.utc1)) === day ||
-            newZeroOClock(new Date(page.utc2)) === day
-    );
 };
 
 let insertedView: {
@@ -232,6 +259,7 @@ const exhaustiveCheck = (x: never): never => {
 
 // 日ごとの値を集計する
 const getDayValue = async (
+    storage: LifeLogStorage,
     email: string,
     day: Date,
     retryCount: number
@@ -240,12 +268,13 @@ const getDayValue = async (
         return { finished: 0, agreement: 0 };
     }
     // その日のページ一覧を取得
-    const pages = await getLifeLogPagesAtDay(email, day);
+    const pages = await storage.getPagesAtDay(email, day);
 
     // 最新のページを優先する
     for (let i = pages.length - 1; 0 <= i; i--) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const { data } = pages[i]!;
+
         switch (data.kind) {
             // property
             case undefined: {
@@ -263,18 +292,24 @@ const getDayValue = async (
         }
     }
     // 見つからなかったので前の日を検索する
-    return getDayValue(email, newAddDays(day, -1), retryCount - 1);
+    return getDayValue(storage, email, newAddDays(day, -1), retryCount - 1);
 };
 
-const onNewLog = async (email: string, log: DeepReadonly<LifeLogData>) => {
+const onNewLog = async (
+    storage: LifeLogStorage,
+    email: string,
+    log: DeepReadonly<LifeLogData>
+) => {
     // 永続記録に追記
-    await appendLifeLogPage(email, log);
+    await storage.appendPage(email, log);
 
     // グラフを更新
     const now = new Date();
     const days = 7;
     const daySummaries = await Promise.all(
-        range(days).map((i) => getDayValue(email, newAddDays(now, -i), 7))
+        range(days).map((i) =>
+            getDayValue(storage, email, newAddDays(now, -i), 7)
+        )
     );
     const view = await getInsertedView();
     view.chart.setData(now, daySummaries);
@@ -282,29 +317,50 @@ const onNewLog = async (email: string, log: DeepReadonly<LifeLogData>) => {
 
 let lastEmail: string | null = null;
 // プロパティを要求したとき
-const onGetProperties = async function (this: XMLHttpRequest) {
-    // 応答を取得
-    const {
-        version,
-        result: {
+const onGetProperties = (storage: LifeLogStorage) =>
+    async function (this: XMLHttpRequest) {
+        // 応答を取得
+        const {
+            version,
+            result: {
+                performance,
+                rewardProgress,
+                socialProfile: { email },
+            },
+        } = parseResponse(PropertiesResponseSpec, this);
+
+        lastEmail = email;
+        await onNewLog(storage, email, {
+            version,
             performance,
             rewardProgress,
-            socialProfile: { email },
-        },
-    } = parseResponse(PropertiesResponseSpec, this);
+        });
+    };
 
-    lastEmail = email;
-    await onNewLog(email, { version, performance, rewardProgress });
-};
+const onGetProfile = (storage: LifeLogStorage) =>
+    async function (this: XMLHttpRequest) {
+        if (lastEmail == null) {
+            return;
+        }
 
-const onGetProfile = async function (this: XMLHttpRequest) {
-    if (lastEmail == null) {
-        return;
-    }
-    // 応答を取得
-    const {
-        version,
-        result: {
+        // 応答を取得
+        const {
+            version,
+            result: {
+                performance,
+                finished,
+                accepted,
+                rejected,
+                duplicated,
+                progress,
+                available,
+                total,
+            },
+        } = parseResponse(ProfileResponseSpec, this);
+
+        await onNewLog(storage, lastEmail, {
+            kind: "profile",
+            version,
             performance,
             finished,
             accepted,
@@ -313,22 +369,8 @@ const onGetProfile = async function (this: XMLHttpRequest) {
             progress,
             available,
             total,
-        },
-    } = parseResponse(ProfileResponseSpec, this.response);
-
-    await onNewLog(lastEmail, {
-        kind: "profile",
-        version,
-        performance,
-        finished,
-        accepted,
-        rejected,
-        duplicated,
-        progress,
-        available,
-        total,
-    });
-};
+        });
+    };
 
 const handleAsyncError = <TThis>(
     asyncAction: (this: TThis) => Promise<void>
@@ -339,15 +381,18 @@ const handleAsyncError = <TThis>(
         });
     };
 
+const lifelogStorageKey = "WAYFARER_LIFELOG_";
 export const main = (global: BrowserGlobal) => {
+    const storage = localStorageStorage(lifelogStorageKey);
+
     injectXHRGet(
         global,
         "/api/v1/vault/properties",
-        handleAsyncError(onGetProperties)
+        handleAsyncError(onGetProperties(storage))
     );
     injectXHRGet(
         global,
         "/api/v1/vault/profile",
-        handleAsyncError(onGetProfile)
+        handleAsyncError(onGetProfile(storage))
     );
 };
