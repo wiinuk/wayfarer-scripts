@@ -31,5 +31,3 @@ jobs:
       id: changes
     - run: npm run commit-user-script
       if: matrix.node-version == '16.x' && steps.changes.outputs.count > 0
-      
-    
