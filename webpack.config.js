@@ -1,7 +1,7 @@
 //@ts-check
 const UserScriptPlugin = require("./webpack-user-script-plugin");
 
-const entry = "./wayfarer-lifelog.user.ts";
+const entry = "./source/wayfarer-lifelog.user.ts";
 
 /** @type {import("webpack").Configuration} */
 const config = {

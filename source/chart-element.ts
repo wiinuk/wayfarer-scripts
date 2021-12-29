@@ -1,6 +1,6 @@
 import Chart from "chart.js/auto";
 import { range } from "./array-extensions";
-import Resources from "./resources.json";
+import Resources from "../resources.json";
 const { Messages } = Resources;
 
 const DayOfWeeks = [
