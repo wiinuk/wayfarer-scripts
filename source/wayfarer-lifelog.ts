@@ -3,19 +3,11 @@ import { range } from "./array-extensions";
 import * as V from "./json-spec";
 import * as D from "./date-time";
 import { DateTime } from "./date-time";
-
-type primitive = undefined | null | boolean | number | bigint | string;
-type DeepReadonly<T> = T extends primitive
-    ? T
-    : T extends (infer e)[]
-    ? DeepReadonly<e>[]
-    : T extends Map<infer k, infer v>
-    ? Map<DeepReadonly<k>, DeepReadonly<v>>
-    : T extends Set<infer k>
-    ? Set<DeepReadonly<k>>
-    : T extends object
-    ? { readonly [k in keyof T]: DeepReadonly<T[k]> }
-    : T;
+import {
+    LifeLogStorage as LogStorage,
+    localStorageStorage,
+} from "./lifelog-storage";
+import { DeepReadonly } from "./type-utils";
 
 interface BrowserGlobal {
     readonly XMLHttpRequest: typeof XMLHttpRequest;
@@ -122,95 +114,8 @@ type ProfileLog = ProfileResult & {
     kind: "profile";
     version: string;
 };
-type LifeLogData = PropertiesLog | ProfileLog;
-type LifeLogPage = {
-    /** 期間の始め */
-    utc1: string;
-    /** 期間の終わり */
-    utc2: string;
-    data: LifeLogData;
-};
-type LifeLog = LifeLogPage[];
-type LifeLogs = { [email: string]: LifeLog };
-
-export const appendLifeLogPageTo = async (
-    lifeLogs: LifeLogs,
-    email: string,
-    data: DeepReadonly<LifeLogData>
-) => {
-    const lifeLog = (lifeLogs[email] ??= []);
-
-    const now = D.toISOString(D.now());
-    const newPage = {
-        utc1: now,
-        utc2: now,
-        data,
-    };
-
-    // 最後のページと新しいページが同じ内容なら、最後のページの日付を更新する
-    const lastPage = lifeLog[lifeLog.length - 1];
-    if (
-        lastPage != null &&
-        JSON.stringify(lastPage.data) === JSON.stringify(newPage.data)
-    ) {
-        lastPage.utc2 = newPage.utc2;
-    }
-    // 最後のページと新しいページが同じ内容でないなら、新しいページを最後に挿入する
-    else {
-        lifeLog.push(newPage);
-    }
-};
-
-interface LifeLogStorage {
-    appendPage(email: string, data: DeepReadonly<LifeLogData>): Promise<void>;
-    getPagesAtDay(email: string, day: DateTime): Promise<LifeLogPage[]>;
-    logs: AsyncIterable<{
-        email: string;
-        pages: AsyncIterable<LifeLogPage>;
-    }>;
-}
-
-const localStorageStorage = (key: string): LifeLogStorage => {
-    return {
-        async appendPage(email: string, data: DeepReadonly<LifeLogData>) {
-            const lifeLogs: LifeLogs = JSON.parse(
-                localStorage.getItem(key) || JSON.stringify({})
-            );
-            await appendLifeLogPageTo(lifeLogs, email, data);
-            localStorage.setItem(key, JSON.stringify(lifeLogs));
-        },
-        async getPagesAtDay(email: string, date: DateTime) {
-            const lifeLogs: LifeLogs = JSON.parse(
-                localStorage.getItem(key) || JSON.stringify({})
-            );
-            const logs = lifeLogs[email] ?? [];
-            const day = zeroOClock(date);
-            return logs.filter(
-                (page) =>
-                    zeroOClock(D.parse(page.utc1)) === day ||
-                    zeroOClock(D.parse(page.utc2)) === day
-            );
-        },
-        get logs() {
-            async function* logs() {
-                const lifeLogs: LifeLogs = JSON.parse(
-                    localStorage.getItem(key) || JSON.stringify({})
-                );
-                for (const email in lifeLogs) {
-                    yield {
-                        email,
-                        pages: (async function* pages() {
-                            yield* lifeLogs[email] ?? [];
-                        })(),
-                    };
-                }
-            }
-            return logs();
-        },
-    };
-};
-
-const zeroOClock = (date: DateTime) => D.withHours(date, 0, 0, 0, 0);
+export type LifeLogData = PropertiesLog | ProfileLog;
+type LifeLogStorage = LogStorage<DeepReadonly<LifeLogData>>;
 
 let insertedView: {
     chart: {
@@ -382,7 +287,7 @@ const handleAsyncError = <TThis>(
 
 const lifelogStorageKey = "WAYFARER_LIFELOG_";
 export const main = (global: BrowserGlobal) => {
-    const storage = localStorageStorage(lifelogStorageKey);
+    const storage: LifeLogStorage = localStorageStorage(lifelogStorageKey);
 
     injectXHRGet(
         global,

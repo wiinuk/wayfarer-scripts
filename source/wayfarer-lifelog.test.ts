@@ -1,5 +1,6 @@
 import { addSeconds, newUTC, usingDateTimeStatics } from "./date-time";
-import { appendLifeLogPageTo } from "./wayfarer-lifelog";
+import { LifeLogPage, LifeLogStorage, memoryStorage } from "./lifelog-storage";
+import { LifeLogData } from "./wayfarer-lifelog";
 
 const getDateTimeStatics = ({ epoch = newUTC(2000, 0, 1) } = {}) => {
     return {
@@ -14,24 +15,37 @@ const getDateTimeStatics = ({ epoch = newUTC(2000, 0, 1) } = {}) => {
 const usingMocks = <T>(action: () => Promise<T>) =>
     usingDateTimeStatics(() => getDateTimeStatics(), action);
 
+const collectLogs = async <T>(storage: LifeLogStorage<T>) => {
+    const logs: { [email: string]: LifeLogPage<T>[] } = Object.create(null);
+
+    for await (const { email, pages } of storage.logs) {
+        const pageList = [];
+        for await (const page of pages) {
+            pageList.push(page);
+        }
+        logs[email] = pageList;
+    }
+    return logs;
+};
+
 describe("serialization", () => {
     it("2ページ追記", () =>
         usingMocks(async () => {
-            const lifeLogs = {};
+            const lifeLogs: LifeLogStorage<LifeLogData> = memoryStorage();
             const data = {
                 version: "0",
                 performance: "good",
             };
-            await appendLifeLogPageTo(lifeLogs, "address", {
+            await lifeLogs.appendPage("address", {
                 ...data,
                 rewardProgress: 0,
             });
-            await appendLifeLogPageTo(lifeLogs, "address", {
+            await lifeLogs.appendPage("address", {
                 ...data,
                 rewardProgress: 1,
             });
-
-            expect(lifeLogs).toEqual({
+            const logs = await collectLogs(lifeLogs);
+            expect(logs).toEqual({
                 address: [
                     {
                         utc1: "2000-01-01T00:00:01.000Z",
@@ -56,14 +70,15 @@ describe("serialization", () => {
         }));
     it("同じデータの連続したページはマージ", () =>
         usingMocks(async () => {
-            const logs = {};
+            const storage: LifeLogStorage<LifeLogData> = memoryStorage();
             const data = {
                 version: "0",
                 performance: "good",
                 rewardProgress: 0,
             };
-            await appendLifeLogPageTo(logs, "address", data);
-            await appendLifeLogPageTo(logs, "address", data);
+            await storage.appendPage("address", data);
+            await storage.appendPage("address", data);
+            const logs = await collectLogs(storage);
 
             expect(logs).toEqual({
                 address: [
