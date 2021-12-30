@@ -8,6 +8,8 @@ import {
     localStorageStorage,
 } from "./lifelog-storage";
 import { DeepReadonly } from "./type-utils";
+import { sleep } from "./standard-extensions";
+import { lazy } from "./lazy";
 
 interface BrowserGlobal {
     readonly XMLHttpRequest: typeof XMLHttpRequest;
@@ -32,9 +34,6 @@ const injectXHRGet = (
         originalOpen.apply(this, arguments as any);
     };
 };
-const sleep = (milliseconds: number) =>
-    new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
-
 const waitElement = async (
     selectors: string,
     retryCount = 10,
@@ -117,22 +116,12 @@ type ProfileLog = ProfileResult & {
 export type LifeLogData = PropertiesLog | ProfileLog;
 type LifeLogStorage = LogStorage<DeepReadonly<LifeLogData>>;
 
-let insertedView: {
-    chart: {
-        setData: (
-            currentDate: DateTime,
-            values: readonly Readonly<DaySummary>[]
-        ) => void;
-    };
-} | null = null;
-
-const getInsertedView = async () => {
-    if (insertedView != null) {
-        return insertedView;
-    }
-
+const insertedView = lazy(async () => {
     // グラフの親要素の表示を待つ
-    const parentElement = await waitElement("wf-header > div");
+    const parentElement = await waitElement(
+        "wf-header > div",
+        Number.MAX_SAFE_INTEGER
+    );
 
     // 要素を作成
     const containerElement = document.createElement("div");
@@ -155,8 +144,9 @@ const getInsertedView = async () => {
         containerElement,
         parentElement.querySelector(":scope > a")
     );
-    return (insertedView = { chart });
-};
+    return { chart };
+});
+
 const exhaustiveCheck = (x: never): never => {
     throw new Error(`Unexpected value. ${JSON.stringify(x)}`);
 };
@@ -216,7 +206,7 @@ const onNewLog = async (
             getDaySummary(storage, email, D.addDays(now, days - i), days)
         )
     );
-    const view = await getInsertedView();
+    const view = await insertedView();
     view.chart.setData(now, daySummaries);
 };
 

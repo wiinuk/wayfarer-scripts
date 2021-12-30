@@ -1,6 +1,6 @@
 import { now, usingDateTimeStatics, ofDate, toISOString } from "./date-time";
 
-describe("date-time.usingDateTimeStatics", () => {
+describe("usingDateTimeStatics", () => {
     const utcDate = (year: number, month: number, day: number) =>
         new Date(Date.UTC(year, month, day));
 
