@@ -213,17 +213,9 @@ const onNewLog = async (
     const days = 7;
     const daySummaries = await Promise.all(
         range(days).map((i) =>
-            getDaySummary(
-                storage,
-                email,
-                (console.log(D.toISOString(D.addDays(now, -days + i))),
-                D.addDays(now, days - i)),
-                7
-            )
+            getDaySummary(storage, email, D.addDays(now, days - i), days)
         )
     );
-    console.log(daySummaries);
-
     const view = await getInsertedView();
     view.chart.setData(now, daySummaries);
 };
