@@ -1,4 +1,4 @@
-import { addDays, addSeconds, newUTC } from "./date-time";
+import { addDays, addSeconds, DateTime, newUTC } from "./date-time";
 import {
     LifeLogPage,
     LifeLogStorage as LogStorage,
@@ -92,6 +92,40 @@ describe("serialization", () => {
         }));
 });
 describe("getDaySummary", () => {
+    it("差分を計算する", () =>
+        usingMocks(async () => {
+            const storage: LifeLogStorage = memoryStorage();
+            const email = "address";
+            const data: LifeLogData = {
+                version: "0",
+                kind: "profile",
+                performance: "good",
+
+                finished: 10,
+                progress: 0,
+
+                // アグリーメント
+                accepted: 1,
+                rejected: 2,
+                duplicated: 3,
+
+                // アップグレード
+                available: 1,
+                total: 2,
+            };
+            const append = (date: DateTime, finished: number) =>
+                storage.appendPage(email, date, { ...data, finished });
+            const get = async (date: DateTime) =>
+                (await getDaySummary(storage, email, date, 7)).finished;
+
+            await append(newUTC(2000, 0, 1), 10);
+            await append(newUTC(2000, 0, 2), 15);
+            await append(newUTC(2000, 0, 3), 15);
+
+            expect(await get(newUTC(2000, 0, 1))).toEqual(0);
+            expect(await get(newUTC(2000, 0, 2))).toEqual(5);
+            expect(await get(newUTC(2000, 0, 3))).toEqual(0);
+        }));
     it("記録がない日は前の日の記録から補完する", () =>
         usingMocks(async () => {
             const storage: LifeLogStorage = memoryStorage();
@@ -123,8 +157,7 @@ describe("getDaySummary", () => {
                     7
                 );
                 expect(summary).toEqual({
-                    finished: 10,
-                    agreement: 6,
+                    finished: 0,
                 });
             }
         }));

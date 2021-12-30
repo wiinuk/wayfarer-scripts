@@ -1,9 +1,10 @@
-import { appendChartElement, DaySummary } from "./chart-element";
+import { appendChartElement } from "./chart-element";
 import { range } from "./array-extensions";
 import * as V from "./json-spec";
 import * as D from "./date-time";
 import { DateTime } from "./date-time";
 import {
+    LifeLogPage,
     LifeLogStorage as LogStorage,
     localStorageStorage,
 } from "./lifelog-storage";
@@ -151,15 +152,15 @@ const exhaustiveCheck = (x: never): never => {
     throw new Error(`Unexpected value. ${JSON.stringify(x)}`);
 };
 
-// 日ごとの値を集計する
-export const getDaySummary = async (
-    storage: LifeLogStorage,
+export const pickLog = async <T, U>(
+    storage: LogStorage<T>,
     email: string,
     day: DateTime,
-    retryCount: number
-): Promise<DaySummary> => {
+    retryCount: number,
+    picker: (log: LifeLogPage<T>) => U | undefined
+): Promise<U | undefined> => {
     if (!(0 < retryCount)) {
-        return {};
+        return;
     }
     // その日のページ一覧を取得
     const pages = await storage.getPagesAtDay(email, day);
@@ -167,26 +168,63 @@ export const getDaySummary = async (
     // 最新のページを優先する
     for (let i = pages.length - 1; 0 <= i; i--) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const { data } = pages[i]!;
+        const result = picker(pages[i]!);
+        if (result !== undefined) {
+            return result;
+        }
+    }
+    // 見つからなかったので前の日を検索する
+    return pickLog(storage, email, D.addDays(day, -1), retryCount - 1, picker);
+};
 
+export const getDaySummary = async (
+    storage: LifeLogStorage,
+    email: string,
+    day: D.DateTime,
+    retryCount: number
+) => {
+    const pick = ({ data }: LifeLogPage<LifeLogData>) => {
         switch (data.kind) {
             // property
             case undefined: {
                 break;
             }
             case "profile": {
-                return {
-                    finished: data.finished,
-                    agreement: data.accepted + data.rejected + data.duplicated,
-                };
+                return data.finished;
             }
             default: {
                 exhaustiveCheck(data);
             }
         }
+    };
+    const todayData = await pickLog(storage, email, day, retryCount, pick);
+    const yesterdayData = await pickLog(
+        storage,
+        email,
+        D.addDays(day, -1),
+        retryCount,
+        pick
+    );
+
+    if (todayData && yesterdayData) {
+        return { finished: todayData - yesterdayData };
     }
-    // 見つからなかったので前の日を検索する
-    return getDaySummary(storage, email, D.addDays(day, -1), retryCount - 1);
+    return { finished: 0 };
+};
+
+const updateChart = async (
+    storage: LifeLogStorage,
+    email: string,
+    now: D.DateTime
+) => {
+    const days = 7;
+    const daySummaries = await Promise.all(
+        range(days).map((i) =>
+            getDaySummary(storage, email, D.addDays(now, days - i), days)
+        )
+    );
+    const view = await insertedView();
+    view.chart.setData(now, daySummaries);
 };
 
 const onNewLog = async (
@@ -200,14 +238,7 @@ const onNewLog = async (
     await storage.appendPage(email, now, log);
 
     // グラフを更新
-    const days = 7;
-    const daySummaries = await Promise.all(
-        range(days).map((i) =>
-            getDaySummary(storage, email, D.addDays(now, days - i), days)
-        )
-    );
-    const view = await insertedView();
-    view.chart.setData(now, daySummaries);
+    await updateChart(storage, email, now);
 };
 
 let lastEmail: string | null = null;

@@ -16,8 +16,7 @@ const DayOfWeeks = [
 ] as const;
 
 export type DaySummary = {
-    finished?: number;
-    agreement?: number;
+    finished: number;
 };
 export const appendChartElement = (parent: HTMLCanvasElement) => {
     const getDayOfWeekName = (current: DateTime, days: number) =>
@@ -31,26 +30,19 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
         )[1];
 
     const finishedAxisId = "finished";
-    const agreementAxisId = "agreement";
-
     const now = D.newUTC(2000, 0, 1);
     const finishedDataset = {
         label: Messages.Finished,
         data: randomData(),
         yAxisID: finishedAxisId,
     };
-    const agreementDataset = {
-        label: Messages.Agreement,
-        data: randomData(),
-        yAxisID: agreementAxisId,
-    };
     const chart = new Chart(parent, {
-        type: "line",
+        type: "bar",
         data: {
             labels: range(days).map((_, i, xs) =>
                 getDayOfWeekName(now, xs.length - 1 - i)
             ),
-            datasets: [finishedDataset, agreementDataset],
+            datasets: [finishedDataset],
         },
         options: {
             plugins: {
@@ -63,10 +55,6 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
                     type: "linear",
                     position: "left",
                 },
-                [agreementAxisId]: {
-                    type: "linear",
-                    position: "right",
-                },
             },
         },
     });
@@ -78,7 +66,6 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
             getDayOfWeekName(currentDate, xs.length - 1 - i)
         );
         finishedDataset.data = values.map(({ finished }) => finished);
-        agreementDataset.data = values.map(({ agreement }) => agreement);
         chart.update();
     };
     return { setData };
