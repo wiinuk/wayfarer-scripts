@@ -16,15 +16,15 @@ const DayOfWeeks = [
 ] as const;
 
 export type DaySummary = {
-    finished: number;
-    agreement: number;
+    finished?: number;
+    agreement?: number;
 };
 export const appendChartElement = (parent: HTMLCanvasElement) => {
     const getDayOfWeekName = (current: DateTime, days: number) =>
         DayOfWeeks[D.getDayOfWeek(D.addDays(current, -days))];
 
     const days = 7;
-    const randomData = () =>
+    const randomData = (): (number | undefined)[] =>
         range(days).reduce<readonly [number, number[]]>(
             ([n, xs]) => [n + Math.random() * 10, xs.concat(n)],
             [Math.random() * 100, []]
@@ -33,7 +33,7 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
     const finishedAxisId = "finished";
     const agreementAxisId = "agreement";
 
-    const now = D.now();
+    const now = D.newUTC(2000, 0, 1);
     const finishedDataset = {
         label: Messages.Finished,
         data: randomData(),

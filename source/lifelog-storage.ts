@@ -1,21 +1,16 @@
-import {
-    DateTime,
-    toISOString,
-    withHours,
-    now as getNow,
-    parse,
-} from "./date-time";
+import { DateTime, toISOString, withHours, parse } from "./date-time";
 
 type LifeLogs<TData> = { [email: string]: LifeLogPage<TData>[] };
 
 const appendLifeLogPageTo = async <T>(
     lifeLogs: LifeLogs<T>,
     email: string,
+    date: DateTime,
     data: T
 ) => {
     const lifeLog = (lifeLogs[email] ??= []);
 
-    const now = toISOString(getNow());
+    const now = toISOString(date);
     const newPage: LifeLogPage<T> = {
         utc1: now,
         utc2: now,
@@ -44,7 +39,7 @@ export type LifeLogPage<Data> = {
     data: Data;
 };
 export interface LifeLogStorage<TData> {
-    appendPage(email: string, data: TData): Promise<void>;
+    appendPage(email: string, date: DateTime, data: TData): Promise<void>;
     getPagesAtDay(email: string, day: DateTime): Promise<LifeLogPage<TData>[]>;
     logs: AsyncIterable<{
         email: string;
@@ -58,11 +53,11 @@ const jsonStorage = <T>(
     loadJson: () => string | null
 ): LifeLogStorage<T> => {
     return {
-        async appendPage(email: string, data: T) {
+        async appendPage(email, date, data) {
             const lifeLogs: LifeLogs<T> = JSON.parse(
                 loadJson() || JSON.stringify({})
             );
-            await appendLifeLogPageTo(lifeLogs, email, data);
+            await appendLifeLogPageTo(lifeLogs, email, date, data);
             saveJson(JSON.stringify(lifeLogs));
         },
         async getPagesAtDay(email: string, date: DateTime) {

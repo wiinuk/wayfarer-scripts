@@ -1,21 +1,15 @@
-import { addSeconds, newUTC, usingDateTimeStatics } from "./date-time";
-import { LifeLogPage, LifeLogStorage, memoryStorage } from "./lifelog-storage";
-import { LifeLogData } from "./wayfarer-lifelog";
+import { addDays, addSeconds, newUTC } from "./date-time";
+import {
+    LifeLogPage,
+    LifeLogStorage as LogStorage,
+    memoryStorage,
+} from "./lifelog-storage";
+import { getDaySummary, LifeLogData } from "./wayfarer-lifelog";
+type LifeLogStorage = LogStorage<LifeLogData>;
 
-const getDateTimeStatics = ({ epoch = newUTC(2000, 0, 1) } = {}) => {
-    return {
-        _current: addSeconds(epoch, 1),
-        now() {
-            const now = this._current;
-            this._current = addSeconds(this._current, 1);
-            return now;
-        },
-    };
-};
-const usingMocks = <T>(action: () => Promise<T>) =>
-    usingDateTimeStatics(() => getDateTimeStatics(), action);
+const usingMocks = <T>(action: () => Promise<T>) => action();
 
-const collectLogs = async <T>(storage: LifeLogStorage<T>) => {
+const collectLogs = async <T>(storage: LogStorage<T>) => {
     const logs: { [email: string]: LifeLogPage<T>[] } = Object.create(null);
 
     for await (const { email, pages } of storage.logs) {
@@ -31,16 +25,17 @@ const collectLogs = async <T>(storage: LifeLogStorage<T>) => {
 describe("serialization", () => {
     it("2ページ追記", () =>
         usingMocks(async () => {
-            const lifeLogs: LifeLogStorage<LifeLogData> = memoryStorage();
+            const lifeLogs: LifeLogStorage = memoryStorage();
             const data = {
                 version: "0",
                 performance: "good",
             };
-            await lifeLogs.appendPage("address", {
+            const now = addSeconds(newUTC(2000, 0, 1), 1);
+            await lifeLogs.appendPage("address", now, {
                 ...data,
                 rewardProgress: 0,
             });
-            await lifeLogs.appendPage("address", {
+            await lifeLogs.appendPage("address", addSeconds(now, 1), {
                 ...data,
                 rewardProgress: 1,
             });
@@ -70,14 +65,15 @@ describe("serialization", () => {
         }));
     it("同じデータの連続したページはマージ", () =>
         usingMocks(async () => {
-            const storage: LifeLogStorage<LifeLogData> = memoryStorage();
+            const storage: LifeLogStorage = memoryStorage();
             const data = {
                 version: "0",
                 performance: "good",
                 rewardProgress: 0,
             };
-            await storage.appendPage("address", data);
-            await storage.appendPage("address", data);
+            const now = addSeconds(newUTC(2000, 0, 1), 1);
+            await storage.appendPage("address", now, data);
+            await storage.appendPage("address", addSeconds(now, 1), data);
             const logs = await collectLogs(storage);
 
             expect(logs).toEqual({
@@ -93,5 +89,43 @@ describe("serialization", () => {
                     },
                 ],
             });
+        }));
+});
+describe("getDaySummary", () => {
+    it("記録がない日は前の日の記録から補完する", () =>
+        usingMocks(async () => {
+            const storage: LifeLogStorage = memoryStorage();
+            const email = "address";
+            const data: LifeLogData = {
+                version: "0",
+                kind: "profile",
+                performance: "good",
+
+                finished: 10,
+                progress: 0,
+
+                // アグリーメント
+                accepted: 1,
+                rejected: 2,
+                duplicated: 3,
+
+                // アップグレード
+                available: 1,
+                total: 2,
+            };
+            await storage.appendPage(email, newUTC(2000, 0, 1), data);
+
+            for (let i = 0; i < 5; i++) {
+                const summary = await getDaySummary(
+                    storage,
+                    email,
+                    addDays(newUTC(2000, 0, 2), i),
+                    7
+                );
+                expect(summary).toEqual({
+                    finished: 10,
+                    agreement: 6,
+                });
+            }
         }));
 });
