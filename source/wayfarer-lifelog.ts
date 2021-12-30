@@ -162,14 +162,14 @@ const exhaustiveCheck = (x: never): never => {
 };
 
 // 日ごとの値を集計する
-const getDayValue = async (
+export const getDaySummary = async (
     storage: LifeLogStorage,
     email: string,
     day: DateTime,
     retryCount: number
 ): Promise<DaySummary> => {
     if (!(0 < retryCount)) {
-        return { finished: 0, agreement: 0 };
+        return {};
     }
     // その日のページ一覧を取得
     const pages = await storage.getPagesAtDay(email, day);
@@ -196,7 +196,7 @@ const getDayValue = async (
         }
     }
     // 見つからなかったので前の日を検索する
-    return getDayValue(storage, email, D.addDays(day, -1), retryCount - 1);
+    return getDaySummary(storage, email, D.addDays(day, -1), retryCount - 1);
 };
 
 const onNewLog = async (
@@ -204,17 +204,26 @@ const onNewLog = async (
     email: string,
     log: DeepReadonly<LifeLogData>
 ) => {
+    const now = D.now();
+
     // 永続記録に追記
-    await storage.appendPage(email, log);
+    await storage.appendPage(email, now, log);
 
     // グラフを更新
-    const now = D.now();
     const days = 7;
     const daySummaries = await Promise.all(
         range(days).map((i) =>
-            getDayValue(storage, email, D.addDays(now, -i), 7)
+            getDaySummary(
+                storage,
+                email,
+                (console.log(D.toISOString(D.addDays(now, -days + i))),
+                D.addDays(now, days - i)),
+                7
+            )
         )
     );
+    console.log(daySummaries);
+
     const view = await getInsertedView();
     view.chart.setData(now, daySummaries);
 };
