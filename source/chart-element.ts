@@ -1,6 +1,8 @@
 import Chart from "chart.js/auto";
 import { range } from "./array-extensions";
 import Resources from "../resources.json";
+import * as D from "./date-time";
+import { DateTime } from "./date-time";
 const { Messages } = Resources;
 
 const DayOfWeeks = [
@@ -13,20 +15,13 @@ const DayOfWeeks = [
     Messages.Saturday,
 ] as const;
 
-export const newAddDays = (current: Date, days: number) => {
-    const result = new Date(current);
-    result.setHours(result.getHours() + days * 24);
-    return result;
-};
 export type DaySummary = {
     finished: number;
     agreement: number;
 };
 export const appendChartElement = (parent: HTMLCanvasElement) => {
-    const getDayOfWeek = (current: Date, days: number) =>
-        DayOfWeeks[
-            newAddDays(current, -days).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6
-        ];
+    const getDayOfWeekName = (current: DateTime, days: number) =>
+        DayOfWeeks[D.getDayOfWeek(D.addDays(current, -days))];
 
     const days = 7;
     const randomData = () =>
@@ -38,7 +33,7 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
     const finishedAxisId = "finished";
     const agreementAxisId = "agreement";
 
-    const now = new Date();
+    const now = D.now();
     const finishedDataset = {
         label: Messages.Finished,
         data: randomData(),
@@ -53,7 +48,7 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
         type: "line",
         data: {
             labels: range(days).map((_, i, xs) =>
-                getDayOfWeek(now, xs.length - 1 - i)
+                getDayOfWeekName(now, xs.length - 1 - i)
             ),
             datasets: [finishedDataset, agreementDataset],
         },
@@ -76,11 +71,11 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
         },
     });
     const setData = (
-        currentDate: Date,
+        currentDate: DateTime,
         values: readonly Readonly<DaySummary>[]
     ) => {
         chart.data.labels = range(values.length).map((_, i, xs) =>
-            getDayOfWeek(currentDate, xs.length - 1 - i)
+            getDayOfWeekName(currentDate, xs.length - 1 - i)
         );
         finishedDataset.data = values.map(({ finished }) => finished);
         agreementDataset.data = values.map(({ agreement }) => agreement);

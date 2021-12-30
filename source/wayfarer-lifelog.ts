@@ -1,6 +1,8 @@
-import { appendChartElement, DaySummary, newAddDays } from "./chart-element";
+import { appendChartElement, DaySummary } from "./chart-element";
 import { range } from "./array-extensions";
 import * as V from "./json-spec";
+import * as D from "./date-time";
+import { DateTime } from "./date-time";
 
 type primitive = undefined | null | boolean | number | bigint | string;
 type DeepReadonly<T> = T extends primitive
@@ -138,7 +140,7 @@ export const appendLifeLogPageTo = async (
 ) => {
     const lifeLog = (lifeLogs[email] ??= []);
 
-    const now = new Date().toISOString();
+    const now = D.toISOString(D.now());
     const newPage = {
         utc1: now,
         utc2: now,
@@ -161,8 +163,8 @@ export const appendLifeLogPageTo = async (
 
 interface LifeLogStorage {
     appendPage(email: string, data: DeepReadonly<LifeLogData>): Promise<void>;
-    getPagesAtDay(email: string, day: Date): Promise<LifeLogPage[]>;
-    logs(): AsyncIterable<{
+    getPagesAtDay(email: string, day: DateTime): Promise<LifeLogPage[]>;
+    logs: AsyncIterable<{
         email: string;
         pages: AsyncIterable<LifeLogPage>;
     }>;
@@ -177,46 +179,43 @@ const localStorageStorage = (key: string): LifeLogStorage => {
             await appendLifeLogPageTo(lifeLogs, email, data);
             localStorage.setItem(key, JSON.stringify(lifeLogs));
         },
-        async getPagesAtDay(email: string, date: Date) {
+        async getPagesAtDay(email: string, date: DateTime) {
             const lifeLogs: LifeLogs = JSON.parse(
                 localStorage.getItem(key) || JSON.stringify({})
             );
             const logs = lifeLogs[email] ?? [];
-            const day = newZeroOClock(date);
+            const day = zeroOClock(date);
             return logs.filter(
                 (page) =>
-                    newZeroOClock(new Date(page.utc1)).getTime() ===
-                        day.getTime() ||
-                    newZeroOClock(new Date(page.utc2)).getTime() ===
-                        day.getTime()
+                    zeroOClock(D.parse(page.utc1)) === day ||
+                    zeroOClock(D.parse(page.utc2)) === day
             );
         },
-        async *logs() {
-            const lifeLogs: LifeLogs = JSON.parse(
-                localStorage.getItem(key) || JSON.stringify({})
-            );
-            for (const email in lifeLogs) {
-                yield {
-                    email,
-                    pages: (async function* pages() {
-                        yield* lifeLogs[email] ?? [];
-                    })(),
-                };
+        get logs() {
+            async function* logs() {
+                const lifeLogs: LifeLogs = JSON.parse(
+                    localStorage.getItem(key) || JSON.stringify({})
+                );
+                for (const email in lifeLogs) {
+                    yield {
+                        email,
+                        pages: (async function* pages() {
+                            yield* lifeLogs[email] ?? [];
+                        })(),
+                    };
+                }
             }
+            return logs();
         },
     };
 };
 
-const newZeroOClock = (date: Date) => {
-    const result = new Date(date);
-    result.setHours(0, 0, 0, 0);
-    return result;
-};
+const zeroOClock = (date: DateTime) => D.withHours(date, 0, 0, 0, 0);
 
 let insertedView: {
     chart: {
         setData: (
-            currentDate: Date,
+            currentDate: DateTime,
             values: readonly Readonly<DaySummary>[]
         ) => void;
     };
@@ -261,7 +260,7 @@ const exhaustiveCheck = (x: never): never => {
 const getDayValue = async (
     storage: LifeLogStorage,
     email: string,
-    day: Date,
+    day: DateTime,
     retryCount: number
 ): Promise<DaySummary> => {
     if (!(0 < retryCount)) {
@@ -292,7 +291,7 @@ const getDayValue = async (
         }
     }
     // 見つからなかったので前の日を検索する
-    return getDayValue(storage, email, newAddDays(day, -1), retryCount - 1);
+    return getDayValue(storage, email, D.addDays(day, -1), retryCount - 1);
 };
 
 const onNewLog = async (
@@ -304,11 +303,11 @@ const onNewLog = async (
     await storage.appendPage(email, log);
 
     // グラフを更新
-    const now = new Date();
+    const now = D.now();
     const days = 7;
     const daySummaries = await Promise.all(
         range(days).map((i) =>
-            getDayValue(storage, email, newAddDays(now, -i), 7)
+            getDayValue(storage, email, D.addDays(now, -i), 7)
         )
     );
     const view = await getInsertedView();

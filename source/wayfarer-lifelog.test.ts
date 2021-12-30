@@ -1,40 +1,22 @@
+import { addSeconds, newUTC, usingDateTimeStatics } from "./date-time";
 import { appendLifeLogPageTo } from "./wayfarer-lifelog";
 
-const setDateSpy = (epoch = Date.UTC(2000, 0, 1)) => {
-    const oldDate = Date;
-    let lastDate = new oldDate(epoch);
-    const spy = jest.spyOn(global, "Date").mockImplementation(() => {
-        const current = new oldDate(lastDate);
-        current.setSeconds(lastDate.getSeconds() + 1);
-        lastDate = new oldDate(current);
-        return current as unknown as string;
-    });
-    return () => {
-        spy.mockReset();
-        spy.mockRestore();
+const getDateTimeStatics = ({ epoch = newUTC(2000, 0, 1) } = {}) => {
+    return {
+        _current: addSeconds(epoch, 1),
+        now() {
+            const now = this._current;
+            this._current = addSeconds(this._current, 1);
+            return now;
+        },
     };
 };
-
-const using = async <T>(
-    resource:
-        | { dispose(): Promise<void> | void }
-        | (() => Promise<void> | void),
-    action: () => Promise<T> | T
-) => {
-    try {
-        return await action();
-    } finally {
-        if (typeof resource === "function") {
-            await resource();
-        } else {
-            await resource.dispose();
-        }
-    }
-};
+const usingMocks = <T>(action: () => Promise<T>) =>
+    usingDateTimeStatics(() => getDateTimeStatics(), action);
 
 describe("serialization", () => {
     it("2ページ追記", () =>
-        using(setDateSpy(), async () => {
+        usingMocks(async () => {
             const lifeLogs = {};
             const data = {
                 version: "0",
@@ -73,7 +55,7 @@ describe("serialization", () => {
             });
         }));
     it("同じデータの連続したページはマージ", () =>
-        using(setDateSpy(), async () => {
+        usingMocks(async () => {
             const logs = {};
             const data = {
                 version: "0",
