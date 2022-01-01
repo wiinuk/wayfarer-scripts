@@ -1,11 +1,11 @@
 import Chart from "chart.js/auto";
 import { range } from "./array-extensions";
+import { DateTime } from "luxon";
 import Resources from "../resources.json";
-import * as D from "./date-time";
-import { DateTime } from "./date-time";
 const { Messages } = Resources;
 
 const DayOfWeeks = [
+    undefined,
     Messages.Sunday,
     Messages.Monday,
     Messages.Tuesday,
@@ -20,7 +20,7 @@ export type DaySummary = {
 };
 export const appendChartElement = (parent: HTMLCanvasElement) => {
     const getDayOfWeekName = (current: DateTime, days: number) =>
-        DayOfWeeks[D.getDayOfWeek(D.addDays(current, -days))];
+        DayOfWeeks[current.plus({ days: -days }).weekday];
 
     const days = 7;
     const randomData = (): (number | undefined)[] =>
@@ -30,7 +30,7 @@ export const appendChartElement = (parent: HTMLCanvasElement) => {
         )[1];
 
     const finishedAxisId = "finished";
-    const now = D.newUTC(2000, 0, 1);
+    const now = DateTime.utc(2000, 1, 1);
     const finishedDataset = {
         label: Messages.Finished,
         data: randomData(),

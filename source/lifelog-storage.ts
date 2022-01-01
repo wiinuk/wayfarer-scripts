@@ -1,4 +1,4 @@
-import { DateTime, toISOString, withHours, parse } from "./date-time";
+import { DateTime, Zone } from "luxon";
 
 type LifeLogs<TData> = { [email: string]: LifeLogPage<TData>[] };
 
@@ -10,7 +10,7 @@ const appendLifeLogPageTo = async <T>(
 ) => {
     const lifeLog = (lifeLogs[email] ??= []);
 
-    const now = toISOString(date);
+    const now = date.toISO();
     const newPage: LifeLogPage<T> = {
         utc1: now,
         utc2: now,
@@ -47,59 +47,77 @@ export interface LifeLogStorage<TData> {
     }>;
 }
 
-const zeroOClock = (date: DateTime) => withHours(date, 0, 0, 0, 0);
-const jsonStorage = <T>(
-    saveJson: (json: string) => void,
-    loadJson: () => string | null
-): LifeLogStorage<T> => {
-    return {
-        async appendPage(email, date, data) {
-            const lifeLogs: LifeLogs<T> = JSON.parse(
-                loadJson() || JSON.stringify({})
+abstract class JsonStorage<T> implements LifeLogStorage<T> {
+    protected abstract _protected_saveJson(json: string): void;
+    protected abstract _protected_loadJson(): string | null;
+    async appendPage(email: string, date: DateTime, data: T) {
+        const lifeLogs: LifeLogs<T> = JSON.parse(
+            this._protected_loadJson() || JSON.stringify({})
+        );
+        await appendLifeLogPageTo(lifeLogs, email, date, data);
+        this._protected_saveJson(JSON.stringify(lifeLogs));
+    }
+    async getPagesAtDay(email: string, date: DateTime) {
+        const lifeLogs: LifeLogs<T> = JSON.parse(
+            this._protected_loadJson() || JSON.stringify({})
+        );
+        const parseUtcToBeginningOfDay = (
+            utcIsoDateString: string,
+            timeZone: Zone | undefined
+        ) =>
+            DateTime.fromISO(utcIsoDateString, { zone: timeZone }).startOf(
+                "day"
             );
-            await appendLifeLogPageTo(lifeLogs, email, date, data);
-            saveJson(JSON.stringify(lifeLogs));
-        },
-        async getPagesAtDay(email: string, date: DateTime) {
-            const lifeLogs: LifeLogs<T> = JSON.parse(
-                loadJson() || JSON.stringify({})
-            );
-            const logs = lifeLogs[email] ?? [];
-            const day = zeroOClock(date);
-            return logs.filter(
-                (page) =>
-                    zeroOClock(parse(page.utc1)) === day ||
-                    zeroOClock(parse(page.utc2)) === day
-            );
-        },
-        get logs() {
-            async function* logs() {
-                const lifeLogs: LifeLogs<T> = JSON.parse(
-                    loadJson() || JSON.stringify({})
-                );
-                for (const email in lifeLogs) {
-                    yield {
-                        email,
-                        pages: (async function* pages() {
-                            yield* lifeLogs[email] ?? [];
-                        })(),
-                    };
-                }
-            }
-            return logs();
-        },
-    };
-};
 
-export const memoryStorage = <T>(): LifeLogStorage<T> => {
-    let json: string | null = null;
-    return jsonStorage(
-        (j) => (json = j),
-        () => json
-    );
-};
+        const logs = lifeLogs[email] ?? [];
+        const day = date.startOf("day");
+        const timeZone = date.zone;
+        return logs.filter(
+            (page) =>
+                parseUtcToBeginningOfDay(page.utc1, timeZone).equals(day) ||
+                parseUtcToBeginningOfDay(page.utc2, timeZone).equals(day)
+        );
+    }
+    get logs() {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        const that = this;
+        async function* logs() {
+            const lifeLogs: LifeLogs<T> = JSON.parse(
+                that._protected_loadJson() || JSON.stringify({})
+            );
+            for (const email in lifeLogs) {
+                yield {
+                    email,
+                    pages: (async function* pages() {
+                        yield* lifeLogs[email] ?? [];
+                    })(),
+                };
+            }
+        }
+        return logs();
+    }
+}
+class MemoryStorage<T> extends JsonStorage<T> {
+    private _json: string | null = null;
+    protected override _protected_loadJson() {
+        return this._json;
+    }
+    protected override _protected_saveJson(json: string) {
+        this._json = json;
+    }
+}
+export const memoryStorage = <T>(): LifeLogStorage<T> => new MemoryStorage<T>();
+
+class LocalStorageStorage<T> extends JsonStorage<T> {
+    constructor(private _key: string) {
+        super();
+    }
+    protected override _protected_loadJson() {
+        return localStorage.getItem(this._key);
+    }
+    protected override _protected_saveJson(json: string): void {
+        localStorage.setItem(this._key, json);
+    }
+}
 export const localStorageStorage = <T>(key: string): LifeLogStorage<T> =>
-    jsonStorage(
-        (j) => localStorage.setItem(key, j),
-        () => localStorage.getItem(key)
-    );
+    new LocalStorageStorage<T>(key);

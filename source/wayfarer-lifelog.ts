@@ -1,8 +1,6 @@
 import { appendChartElement } from "./chart-element";
 import { range } from "./array-extensions";
 import * as V from "./json-spec";
-import * as D from "./date-time";
-import { DateTime } from "./date-time";
 import {
     LifeLogPage,
     LifeLogStorage as LogStorage,
@@ -11,6 +9,8 @@ import {
 import { DeepReadonly } from "./type-utils";
 import { sleep } from "./standard-extensions";
 import { lazy } from "./lazy";
+// spell-checker: ignore luxon
+import { DateTime } from "luxon";
 
 interface BrowserGlobal {
     readonly XMLHttpRequest: typeof XMLHttpRequest;
@@ -174,13 +174,19 @@ export const pickLog = async <T, U>(
         }
     }
     // 見つからなかったので前の日を検索する
-    return pickLog(storage, email, D.addDays(day, -1), retryCount - 1, picker);
+    return pickLog(
+        storage,
+        email,
+        day.plus({ days: -1 }),
+        retryCount - 1,
+        picker
+    );
 };
 
 export const getDaySummary = async (
     storage: LifeLogStorage,
     email: string,
-    day: D.DateTime,
+    day: DateTime,
     retryCount: number
 ) => {
     const pick = ({ data }: LifeLogPage<LifeLogData>) => {
@@ -201,12 +207,12 @@ export const getDaySummary = async (
     const yesterdayData = await pickLog(
         storage,
         email,
-        D.addDays(day, -1),
+        day.plus({ days: -1 }),
         retryCount,
         pick
     );
 
-    if (todayData && yesterdayData) {
+    if (todayData !== undefined && yesterdayData !== undefined) {
         return { finished: todayData - yesterdayData };
     }
     return { finished: 0 };
@@ -215,12 +221,17 @@ export const getDaySummary = async (
 const updateChart = async (
     storage: LifeLogStorage,
     email: string,
-    now: D.DateTime
+    now: DateTime
 ) => {
     const days = 7;
     const daySummaries = await Promise.all(
         range(days).map((i) =>
-            getDaySummary(storage, email, D.addDays(now, days - i), days)
+            getDaySummary(
+                storage,
+                email,
+                now.plus({ days: -days + 1 + i }),
+                days
+            )
         )
     );
     const view = await insertedView();
@@ -232,7 +243,7 @@ const onNewLog = async (
     email: string,
     log: DeepReadonly<LifeLogData>
 ) => {
-    const now = D.now();
+    const now = DateTime.local();
 
     // 永続記録に追記
     await storage.appendPage(email, now, log);
