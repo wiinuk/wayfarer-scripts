@@ -7,7 +7,7 @@ import {
     localStorageStorage,
 } from "./lifelog-storage";
 import { DeepReadonly } from "./type-utils";
-import { sleep } from "./standard-extensions";
+import { error, sleep } from "./standard-extensions";
 import { lazy } from "./lazy";
 // spell-checker: ignore luxon
 import { DateTime } from "luxon";
@@ -17,8 +17,8 @@ interface BrowserGlobal {
 }
 
 const injectXHRGet = (
-    { XMLHttpRequest }: BrowserGlobal,
-    targetUrl: string | URL,
+    XMLHttpRequest: typeof globalThis.XMLHttpRequest,
+    targetUrl: string,
     onGet: {
         (
             this: XMLHttpRequest,
@@ -93,12 +93,12 @@ type ProfileResult = typeof ProfileResultSpec.imitation;
 const _ProfileResponseSpec = ResponseSpec(ProfileResultSpec);
 const ProfileResponseSpec: typeof _ProfileResponseSpec = _ProfileResponseSpec;
 
-const parseResponse = <T>(spec: V.Spec<T>, xhr: XMLHttpRequest) => {
+const parseResponse = <T>(spec: V.Spec<T>, responseJson: string) => {
     let data;
     try {
-        data = JSON.parse(xhr.response);
+        data = JSON.parse(responseJson);
     } catch (e) {
-        throw new Error(`JSON の解析に失敗しました。${xhr.response}`);
+        throw new Error(`JSON の解析に失敗しました。${responseJson}`);
     }
     spec.validate(data);
     return data;
@@ -139,13 +139,11 @@ const insertedView = lazy(async () => {
     }
     const canvasElement = document.createElement("canvas");
     containerElement.appendChild(canvasElement);
-    const chart = appendChartElement(canvasElement);
-
     parentElement.insertBefore(
         containerElement,
         parentElement.querySelector(":scope > a")
     );
-    return { chart };
+    return { chart: appendChartElement(canvasElement) };
 });
 
 const exhaustiveCheck = (x: never): never => {
@@ -254,8 +252,10 @@ const onNewLog = async (
 
 let lastEmail: string | null = null;
 // プロパティを要求したとき
-const onGetProperties = (storage: LifeLogStorage) =>
-    async function (this: XMLHttpRequest) {
+const onGetProperties = async (
+    storage: LifeLogStorage,
+    responseJson: string
+) => {
         // 応答を取得
         const {
             version,
@@ -264,7 +264,7 @@ const onGetProperties = (storage: LifeLogStorage) =>
                 rewardProgress,
                 socialProfile: { email },
             },
-        } = parseResponse(PropertiesResponseSpec, this);
+    } = parseResponse(PropertiesResponseSpec, responseJson);
 
         lastEmail = email;
         await onNewLog(storage, email, {
@@ -274,8 +274,7 @@ const onGetProperties = (storage: LifeLogStorage) =>
         });
     };
 
-const onGetProfile = (storage: LifeLogStorage) =>
-    async function (this: XMLHttpRequest) {
+const onGetProfile = async (storage: LifeLogStorage, responseJson: string) => {
         if (lastEmail == null) {
             return;
         }
@@ -293,7 +292,7 @@ const onGetProfile = (storage: LifeLogStorage) =>
                 available,
                 total,
             },
-        } = parseResponse(ProfileResponseSpec, this);
+    } = parseResponse(ProfileResponseSpec, responseJson);
 
         await onNewLog(storage, lastEmail, {
             kind: "profile",
@@ -309,27 +308,33 @@ const onGetProfile = (storage: LifeLogStorage) =>
         });
     };
 
-const handleAsyncError = <TThis>(
-    asyncAction: (this: TThis) => Promise<void>
-): ((this: TThis) => void) =>
-    function () {
-        asyncAction.call(this).catch((error: unknown) => {
+const lifelogStorageKey = "WAYFARER_LIFELOG_";
+export const main = ({ XMLHttpRequest }: BrowserGlobal) => {
+    const storage: LifeLogStorage = localStorageStorage(lifelogStorageKey);
+    const toOnload = (
+        handler: (
+            storage: LifeLogStorage,
+            responseJson: string
+        ) => Promise<void>
+    ) =>
+        function (this: XMLHttpRequest) {
+            try {
+                handler(storage, this.responseText).catch((error: unknown) => {
             console.error(error);
         });
+            } catch (error) {
+                console.error(error);
+            }
     };
 
-const lifelogStorageKey = "WAYFARER_LIFELOG_";
-export const main = (global: BrowserGlobal) => {
-    const storage: LifeLogStorage = localStorageStorage(lifelogStorageKey);
-
     injectXHRGet(
-        global,
+        XMLHttpRequest,
         "/api/v1/vault/properties",
-        handleAsyncError(onGetProperties(storage))
+        toOnload(onGetProperties)
     );
     injectXHRGet(
-        global,
+        XMLHttpRequest,
         "/api/v1/vault/profile",
-        handleAsyncError(onGetProfile(storage))
+        toOnload(onGetProfile)
     );
 };
